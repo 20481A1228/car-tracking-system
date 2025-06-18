@@ -1592,3 +1592,4 @@ WARNING 2025-06-14 09:13:29,542 log 14300 12596 Not Found: /static/admin/css/dar
 WARNING 2025-06-14 09:13:29,558 log 14300 11032 Not Found: /static/admin/css/base.css
 WARNING 2025-06-14 09:13:29,571 log 14300 8196 Not Found: /static/admin/js/nav_sidebar.js
 WARNING 2025-06-15 11:17:49,196 log 14888 11064 Not Found: /favicon.ico
+WARNING 2025-06-18 07:53:09,584 log 10176 15784 Not Found: /favicon.ico

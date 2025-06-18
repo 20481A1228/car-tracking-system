@@ -631,20 +631,20 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # DEVELOPMENT TOOLS (DEBUG MODE ONLY)
 # ==================================================
 
-if DEBUG:
-    INTERNAL_IPS = ['127.0.0.1', 'localhost']
+# if DEBUG:
+#     INTERNAL_IPS = ['127.0.0.1', 'localhost']
     
-    # Optional: Django Debug Toolbar (install separately)
-    try:
-        import debug_toolbar
-        INSTALLED_APPS.append('debug_toolbar')
-        MIDDLEWARE.insert(0, 'debug_toolbar.middleware.DebugToolbarMiddleware')
-        DEBUG_TOOLBAR_CONFIG = {
-            'SHOW_TOOLBAR_CALLBACK': lambda request: DEBUG,
-        }
-        print("✅ Debug toolbar enabled")
-    except ImportError:
-        pass
+#     # Optional: Django Debug Toolbar (install separately)
+#     try:
+#         import debug_toolbar
+#         INSTALLED_APPS.append('debug_toolbar')
+#         MIDDLEWARE.insert(0, 'debug_toolbar.middleware.DebugToolbarMiddleware')
+#         DEBUG_TOOLBAR_CONFIG = {
+#             'SHOW_TOOLBAR_CALLBACK': lambda request: DEBUG,
+#         }
+#         print("✅ Debug toolbar enabled")
+#     except ImportError:
+#         pass
 
 # ==================================================
 # STREAMING VALIDATION & SETUP
