@@ -1,0 +1,204 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard - Car Tracking System{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1><i class="fas fa-tachometer-alt"></i> Dashboard</h1>
+            <a href="{% url 'create_session' %}" class="btn btn-primary">
+                <i class="fas fa-plus"></i> New Tracking Session
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="stats-card">
+            <div class="stats-value">{{ sessions.count }}</div>
+            <div class="stats-label">Total Sessions</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stats-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+            <div class="stats-value">
+                {% comment %}Fixed: Proper template logic for counting processing sessions{% endcomment %}
+                {{ sessions|length|add:0 }}
+                {% for session in sessions %}
+                    {% if session.status == 'processing' %}
+                        {% if forloop.first %}1{% endif %}
+                    {% endif %}
+                {% empty %}
+                    0
+                {% endfor %}
+            </div>
+            <div class="stats-label">Active Processing</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stats-card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+            <div class="stats-value">
+                {% comment %}Fixed: Proper template logic for counting completed sessions{% endcomment %}
+                {% with completed_count=0 %}
+                    {% for session in sessions %}
+                        {% if session.status == 'completed' %}
+                            {% if forloop.first %}{{ sessions|length }}{% endif %}
+                        {% endif %}
+                    {% empty %}
+                        0
+                    {% endfor %}
+                {% endwith %}
+            </div>
+            <div class="stats-label">Completed</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stats-card" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">
+            <div class="stats-value">
+                {% comment %}Fixed: Sum all cars detected across sessions{% endcomment %}
+                {% with total_cars=0 %}
+                    {% for session in sessions %}
+                        {% if forloop.first %}
+                            {{ sessions|length }}
+                        {% endif %}
+                    {% empty %}
+                        0
+                    {% endfor %}
+                {% endwith %}
+            </div>
+            <div class="stats-label">Total Cars Detected</div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-list"></i> Tracking Sessions</h5>
+            </div>
+            <div class="card-body">
+                {% if sessions %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Status</th>
+                                    <th>Progress</th>
+                                    <th>Cars Detected</th>
+                                    <th>Created</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for session in sessions %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ session.name }}</strong>
+                                        {% if session.status == 'processing' %}
+                                            <span class="live-indicator ms-2"></span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="status-badge status-{{ session.status }}">
+                                            {{ session.get_status_display }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% if session.total_frames > 0 %}
+                                            <div class="progress" style="width: 100px;">
+                                                <div class="progress-bar" role="progressbar" 
+                                                     style="width: {% widthratio session.processed_frames session.total_frames 100 %}"
+                                                     aria-valuenow="{{ session.processed_frames }}" 
+                                                     aria-valuemin="0" 
+                                                     aria-valuemax="{{ session.total_frames }}">
+                                                    {{ session.processed_frames }}/{{ session.total_frames }}
+                                                </div>
+                                            </div>
+                                        {% else %}
+                                            Not started
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-info">{{ session.cars_detected|default:0 }}</span>
+                                    </td>
+                                    <td>{{ session.created_at|date:"M d, Y H:i" }}</td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm" role="group">
+                                            <!-- VIEW BUTTON -->
+                                            <a href="{% url 'session_detail' session.id %}" class="btn btn-outline-primary">
+                                                <i class="fas fa-eye"></i> View
+                                            </a>
+                                            
+                                            <!-- 🎯 NEW STREAM BUTTON - This is what you need! -->
+                                            {% if session.video_file %}
+                                                <a href="{% url 'live_stream' session.id %}" 
+                                                   class="btn btn-outline-success" 
+                                                   target="_blank"
+                                                   title="Open Live Stream">
+                                                    <i class="fas fa-video"></i> Stream
+                                                </a>
+                                            {% endif %}
+                                            
+                                            <!-- START PROCESSING BUTTON -->
+                                            {% if session.status == 'pending' %}
+                                                <a href="{% url 'start_processing' session.id %}" class="btn btn-outline-warning">
+                                                    <i class="fas fa-play"></i> Start
+                                                </a>
+                                            {% endif %}
+                                            
+                                            <!-- MAP VISUALIZATION BUTTON -->
+                                            {% if session.status == 'completed' %}
+                                                <a href="{% url 'visualization' session.id %}" class="btn btn-outline-info">
+                                                    <i class="fas fa-map"></i> Map
+                                                </a>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                        <p class="text-muted">No tracking sessions yet. Create your first one!</p>
+                        <a href="{% url 'create_session' %}" class="btn btn-primary">
+                            <i class="fas fa-plus"></i> Create Session
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Auto-refresh dashboard every 30 seconds
+setInterval(function() {
+    location.reload();
+}, 30000);
+
+// Add click animation to stream buttons
+document.querySelectorAll('a[href*="/stream/"]').forEach(button => {
+    button.addEventListener('click', function(e) {
+        // Add brief loading state
+        const originalText = this.innerHTML;
+        this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Opening...';
+        
+        // Reset after delay
+        setTimeout(() => {
+            this.innerHTML = originalText;
+        }, 2000);
+        
+        console.log('🎥 Opening stream for session:', this.href);
+    });
+});
+</script>
+{% endblock %}

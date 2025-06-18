@@ -1,0 +1,371 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ car.car_id }} - Car Details{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1><i class="fas fa-car"></i> {{ car.car_id }}</h1>
+            <a href="{% url 'session_detail' car.session.id %}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Session
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Car Statistics -->
+<div class="row mb-4">
+    <div class="col-md-2">
+        <div class="card text-center">
+            <div class="card-body">
+                <h5>Total Detections</h5>
+                <div class="h3 text-primary">{{ car.total_detections }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card text-center">
+            <div class="card-body">
+                <h5>Max Speed</h5>
+                <div class="h3 text-success">{{ car.max_speed|floatformat:1 }}</div>
+                <small class="text-muted">km/h</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card text-center">
+            <div class="card-body">
+                <h5>Avg Speed</h5>
+                <div class="h3 text-info">{{ car.avg_speed|floatformat:1 }}</div>
+                <small class="text-muted">km/h</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card text-center">
+            <div class="card-body">
+                <h5>Distance</h5>
+                <div class="h3 text-warning">{{ total_distance|floatformat:0 }}</div>
+                <small class="text-muted">meters</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card text-center">
+            <div class="card-body">
+                <h5>First Seen</h5>
+                <div class="h6">{{ car.first_detected|date:"H:i:s" }}</div>
+                <small class="text-muted">{{ car.first_detected|date:"M d" }}</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card text-center">
+            <div class="card-body">
+                <h5>Last Seen</h5>
+                <div class="h6">{{ car.last_seen|date:"H:i:s" }}</div>
+                <small class="text-muted">{{ car.last_seen|date:"M d" }}</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Car Path Map -->
+<div class="row mb-4">
+    <div class="col-md-9">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-route"></i> Movement Path</h5>
+            </div>
+            <div class="card-body p-0">
+                <div id="carMap" style="height: 500px;"></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <!-- Speed Chart -->
+        <div class="card mb-3">
+            <div class="card-header">
+                <h6><i class="fas fa-tachometer-alt"></i> Speed Over Time</h6>
+            </div>
+            <div class="card-body">
+                <canvas id="speedChart" width="300" height="200"></canvas>
+            </div>
+        </div>
+        
+        <!-- Movement Analysis -->
+        <div class="card">
+            <div class="card-header">
+                <h6><i class="fas fa-analytics"></i> Movement Analysis</h6>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-12 mb-2">
+                        <small class="text-muted">Path Efficiency</small>
+                        <div class="h5" id="pathEfficiency">Calculating...</div>
+                    </div>
+                    <div class="col-6">
+                        <small class="text-muted">Moving Time</small>
+                        <div class="h6" id="movingTime">-</div>
+                    </div>
+                    <div class="col-6">
+                        <small class="text-muted">Stops</small>
+                        <div class="h6" id="totalStops">-</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tracking Points Table -->
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-table"></i> Detailed Tracking Points</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                    <table class="table table-sm table-hover">
+                        <thead class="table-light sticky-top">
+                            <tr>
+                                <th>#</th>
+                                <th>Time</th>
+                                <th>Latitude</th>
+                                <th>Longitude</th>
+                                <th>Speed</th>
+                                <th>Motion</th>
+                                <th>Confidence</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for point in tracking_points %}
+                            <tr class="tracking-point-row" data-lat="{{ point.latitude }}" data-lng="{{ point.longitude }}">
+                                <td>{{ forloop.counter }}</td>
+                                <td>{{ point.timestamp|date:"H:i:s" }}</td>
+                                <td>{{ point.latitude|floatformat:6 }}</td>
+                                <td>{{ point.longitude|floatformat:6 }}</td>
+                                <td>{{ point.speed|floatformat:1 }} km/h</td>
+                                <td>
+                                    {% if point.is_moving %}
+                                        <span class="badge bg-success">Moving</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Stationary</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ point.motion_confidence|floatformat:2 }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Hidden data for JavaScript -->
+<script type="application/json" id="pathData">{{ path_data|safe }}</script>
+{% comment %}Fixed: Properly pass total_distance to JavaScript{% endcomment %}
+<script type="application/json" id="totalDistance">{{ total_distance|default:0 }}</script>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Load path data
+const pathData = JSON.parse(document.getElementById('pathData').textContent);
+const totalDistance = JSON.parse(document.getElementById('totalDistance').textContent);
+
+// Initialize map
+const carMap = L.map('carMap');
+
+// Add satellite layer
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    attribution: 'Tiles © Esri'
+}).addTo(carMap);
+
+// Add car path
+if (pathData.length > 0) {
+    // Create path line
+    const latlngs = pathData.map(p => [p.lat, p.lng]);
+    const pathLine = L.polyline(latlngs, {
+        color: '#3B82F6',
+        weight: 4,
+        opacity: 0.8
+    }).addTo(carMap);
+
+    // Add start marker
+    const startMarker = L.circleMarker([pathData[0].lat, pathData[0].lng], {
+        color: '#22C55E',
+        fillColor: '#22C55E',
+        fillOpacity: 0.8,
+        radius: 10,
+        weight: 3
+    }).addTo(carMap);
+    startMarker.bindPopup('<strong>Start Position</strong><br>Time: ' + new Date(pathData[0].timestamp).toLocaleTimeString());
+
+    // Add end marker
+    const endPoint = pathData[pathData.length - 1];
+    const endMarker = L.circleMarker([endPoint.lat, endPoint.lng], {
+        color: '#EF4444',
+        fillColor: '#EF4444',
+        fillOpacity: 0.8,
+        radius: 10,
+        weight: 3
+    }).addTo(carMap);
+    endMarker.bindPopup('<strong>End Position</strong><br>Time: ' + new Date(endPoint.timestamp).toLocaleTimeString());
+
+    // Add numbered markers for significant points
+    pathData.forEach((point, index) => {
+        if (index % 5 === 0 || index === pathData.length - 1) { // Show every 5th point
+            L.circleMarker([point.lat, point.lng], {
+                color: '#F59E0B',
+                fillColor: '#FCD34D',
+                fillOpacity: 0.7,
+                radius: 6,
+                weight: 2
+            }).addTo(carMap).bindPopup(`
+                <strong>Point ${index + 1}</strong><br>
+                Speed: ${point.speed.toFixed(1)} km/h<br>
+                Time: ${new Date(point.timestamp).toLocaleTimeString()}
+            `);
+        }
+    });
+
+    // Fit map to path
+    carMap.fitBounds(pathLine.getBounds(), {padding: [20, 20]});
+} else {
+    carMap.setView([40.4584, -79.9284], 15);
+}
+
+// Click on table rows to highlight on map
+document.querySelectorAll('.tracking-point-row').forEach(row => {
+    row.addEventListener('click', function() {
+        const lat = parseFloat(this.dataset.lat);
+        const lng = parseFloat(this.dataset.lng);
+        
+        carMap.setView([lat, lng], 19);
+        
+        // Add temporary highlight marker
+        const highlightMarker = L.circleMarker([lat, lng], {
+            color: '#FF0000',
+            fillColor: '#FF0000',
+            fillOpacity: 0.8,
+            radius: 15,
+            weight: 4
+        }).addTo(carMap);
+        
+        setTimeout(() => {
+            carMap.removeLayer(highlightMarker);
+        }, 3000);
+        
+        // Highlight table row
+        document.querySelectorAll('.tracking-point-row').forEach(r => r.classList.remove('table-warning'));
+        this.classList.add('table-warning');
+    });
+});
+
+// Speed Chart
+if (pathData.length > 1) {
+    const ctx = document.getElementById('speedChart').getContext('2d');
+    const speedChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: pathData.map((_, index) => index + 1),
+            datasets: [{
+                label: 'Speed (km/h)',
+                data: pathData.map(p => p.speed),
+                borderColor: '#3B82F6',
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                borderWidth: 2,
+                fill: true,
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Speed (km/h)'
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Point #'
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                }
+            }
+        }
+    });
+}
+
+// Calculate movement analysis
+function calculateMovementAnalysis() {
+    if (pathData.length < 2) return;
+    
+    // Calculate straight-line distance vs actual path
+    const start = pathData[0];
+    const end = pathData[pathData.length - 1];
+    
+    // Haversine formula for straight line distance
+    function getDistance(lat1, lng1, lat2, lng2) {
+        const R = 6371e3; // Earth's radius in meters
+        const φ1 = lat1 * Math.PI/180;
+        const φ2 = lat2 * Math.PI/180;
+        const Δφ = (lat2-lat1) * Math.PI/180;
+        const Δλ = (lng2-lng1) * Math.PI/180;
+        const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+                  Math.cos(φ1) * Math.cos(φ2) *
+                  Math.sin(Δλ/2) * Math.sin(Δλ/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        return R * c;
+    }
+    
+    const straightDistance = getDistance(start.lat, start.lng, end.lat, end.lng);
+    // Fixed: Use the properly passed totalDistance variable
+    const actualDistance = totalDistance;
+    
+    const efficiency = straightDistance > 0 && actualDistance > 0 ? 
+                      (straightDistance / actualDistance * 100) : 0;
+    document.getElementById('pathEfficiency').textContent = efficiency.toFixed(1) + '%';
+    
+    // Calculate moving time and stops
+    let movingPoints = 0;
+    let stops = 0;
+    let wasMoving = false;
+    
+    pathData.forEach(point => {
+        const isMoving = point.speed > 1.0;
+        if (isMoving) {
+            movingPoints++;
+            wasMoving = true;
+        } else if (wasMoving) {
+            stops++;
+            wasMoving = false;
+        }
+    });
+    
+    const movingTime = pathData.length > 0 ? (movingPoints / pathData.length * 100) : 0;
+    document.getElementById('movingTime').textContent = movingTime.toFixed(0) + '%';
+    document.getElementById('totalStops').textContent = stops;
+}
+
+calculateMovementAnalysis();
+
+console.log('Car detail page initialized');
+console.log('Path points:', pathData.length);
+console.log('Total distance:', totalDistance);
+</script>
+{% endblock %}

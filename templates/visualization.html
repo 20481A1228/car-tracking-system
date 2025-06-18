@@ -1,0 +1,402 @@
+{% extends 'base.html' %}
+
+{% block title %}Live Visualization - {{ session.name }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1><i class="fas fa-map"></i> Live Car Tracking - {{ session.name }}</h1>
+            <div>
+                <span class="live-indicator me-2"></span>
+                <span class="text-muted">Live Tracking</span>
+                <a href="{% url 'session_detail' session.id %}" class="btn btn-outline-secondary ms-3">
+                    <i class="fas fa-arrow-left"></i> Back to Session
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Search and Controls -->
+<div class="row mb-3">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-md-4">
+                        <div class="input-group">
+                            <input type="text" id="searchInput" class="form-control" 
+                                   placeholder="Search coordinates or car ID">
+                            <button class="btn btn-outline-primary" id="searchBtn">
+                                <i class="fas fa-search"></i> Search
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col-md-8">
+                        <div class="btn-group" role="group">
+                            <button type="button" class="btn btn-outline-success" id="viewAllBtn">
+                                <i class="fas fa-eye"></i> Show All
+                            </button>
+                            <button type="button" class="btn btn-outline-info active" id="viewLatestBtn">
+                                <i class="fas fa-location-arrow"></i> Latest Positions
+                            </button>
+                            <button type="button" class="btn btn-outline-warning" id="refreshBtn">
+                                <i class="fas fa-sync-alt"></i> Refresh
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Map Container -->
+<div class="row">
+    <div class="col-md-9">
+        <div class="card">
+            <div class="card-body p-0">
+                <div id="map"></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <!-- Statistics Panel -->
+        <div class="card mb-3">
+            <div class="card-header">
+                <h6><i class="fas fa-chart-bar"></i> Live Statistics</h6>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-12 mb-3">
+                        <div class="h4 text-primary mb-0" id="totalCars">{{ total_cars }}</div>
+                        <small class="text-muted">Active Cars</small>
+                    </div>
+                    <div class="col-6">
+                        <div class="h5 text-success mb-0" id="movingCars">0</div>
+                        <small class="text-muted">Moving</small>
+                    </div>
+                    <div class="col-6">
+                        <div class="h5 text-warning mb-0" id="stationaryCars">0</div>
+                        <small class="text-muted">Stationary</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Car List -->
+        <div class="card">
+            <div class="card-header">
+                <h6><i class="fas fa-cars"></i> Active Cars</h6>
+            </div>
+            <div class="card-body p-0" style="max-height: 400px; overflow-y: auto;">
+                <div id="carsList" class="list-group list-group-flush">
+                    <!-- Car list will be populated by JavaScript -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Legend -->
+<div class="row mt-3">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-body">
+                <h6><i class="fas fa-info-circle"></i> Map Legend</h6>
+                <div class="row">
+                    <div class="col-md-3">
+                        <div class="d-flex align-items-center">
+                            <div style="width: 20px; height: 20px; background: #22C55E; border-radius: 50%; margin-right: 10px;"></div>
+                            <span>Start Position</span>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="d-flex align-items-center">
+                            <div style="width: 20px; height: 20px; background: #EF4444; border-radius: 50%; margin-right: 10px;"></div>
+                            <span>Latest Position</span>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="d-flex align-items-center">
+                            <div style="width: 20px; height: 4px; background: #3B82F6; margin-right: 10px;"></div>
+                            <span>Vehicle Path</span>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="d-flex align-items-center">
+                            <div style="width: 20px; height: 4px; background: #F59E0B; margin-right: 10px;"></div>
+                            <span>Recent Movement</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Hidden data -->
+<script type="application/json" id="carsData">{{ cars_data|safe }}</script>
+<script type="application/json" id="sessionId">{{ session.id }}</script>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Load car data and session info
+const carsData = JSON.parse(document.getElementById('carsData').textContent);
+const sessionId = JSON.parse(document.getElementById('sessionId').textContent);
+
+// Initialize map
+const map = L.map('map').setView([40.4584, -79.9284], 18); // Default center
+
+// Add satellite layer
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    attribution: 'Tiles © Esri'
+}).addTo(map);
+
+// Map layers
+let carMarkers = {};
+let pathLines = {};
+
+// Initialize visualization
+function initializeMap() {
+    if (carsData.length === 0) {
+        map.setView([40.4584, -79.9284], 18);
+        return;
+    }
+
+    // Calculate bounds for all car positions
+    let allPoints = [];
+    carsData.forEach(carData => {
+        carData.points.forEach(point => {
+            allPoints.push([point.lat, point.lng]);
+        });
+    });
+
+    if (allPoints.length > 0) {
+        const group = new L.featureGroup(allPoints.map(point => L.marker(point)));
+        map.fitBounds(group.getBounds(), {padding: [20, 20]});
+    }
+
+    // Add cars to map
+    updateMapVisualization();
+}
+
+function updateMapVisualization() {
+    // Clear existing markers and paths
+    Object.values(carMarkers).forEach(marker => map.removeLayer(marker));
+    Object.values(pathLines).forEach(line => map.removeLayer(line));
+    carMarkers = {};
+    pathLines = {};
+
+    carsData.forEach(carData => {
+        const points = carData.points;
+        if (points.length === 0) return;
+
+        // Create path line
+        const latlngs = points.map(p => [p.lat, p.lng]);
+        const pathLine = L.polyline(latlngs, {
+            color: '#3B82F6',
+            weight: 3,
+            opacity: 0.8
+        }).addTo(map);
+        pathLines[carData.car_id] = pathLine;
+
+        // Add start marker (green)
+        if (points.length > 0) {
+            const startMarker = L.circleMarker([points[0].lat, points[0].lng], {
+                color: '#22C55E',
+                fillColor: '#22C55E',
+                fillOpacity: 0.8,
+                radius: 8,
+                weight: 2
+            }).addTo(map);
+            
+            startMarker.bindPopup(`
+                <strong>${carData.car_id} - Start</strong><br>
+                Lat: ${points[0].lat.toFixed(6)}<br>
+                Lng: ${points[0].lng.toFixed(6)}<br>
+                Time: ${new Date(points[0].timestamp).toLocaleTimeString()}
+            `);
+        }
+
+        // Add latest position marker (red)
+        const latestPoint = points[points.length - 1];
+        const latestMarker = L.circleMarker([latestPoint.lat, latestPoint.lng], {
+            color: '#EF4444',
+            fillColor: '#EF4444',
+            fillOpacity: 1.0,
+            radius: 10,
+            weight: 3
+        }).addTo(map);
+
+        latestMarker.bindPopup(`
+            <strong>${carData.car_id} - Latest Position</strong><br>
+            Lat: ${latestPoint.lat.toFixed(6)}<br>
+            Lng: ${latestPoint.lng.toFixed(6)}<br>
+            Speed: ${latestPoint.speed.toFixed(1)} km/h<br>
+            Time: ${new Date(latestPoint.timestamp).toLocaleTimeString()}<br>
+            <strong>Total Points:</strong> ${points.length}
+        `);
+
+        carMarkers[carData.car_id] = latestMarker;
+    });
+
+    updateCarsList();
+    updateStatistics();
+}
+
+function updateCarsList() {
+    const carsList = document.getElementById('carsList');
+    carsList.innerHTML = '';
+
+    carsData.forEach(carData => {
+        if (carData.points.length === 0) return;
+
+        const latestPoint = carData.points[carData.points.length - 1];
+        const carItem = document.createElement('div');
+        carItem.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-center';
+        carItem.style.cursor = 'pointer';
+
+        carItem.innerHTML = `
+            <div>
+                <strong>${carData.car_id}</strong><br>
+                <small class="text-muted">
+                    ${latestPoint.lat.toFixed(6)}, ${latestPoint.lng.toFixed(6)}<br>
+                    Speed: ${latestPoint.speed.toFixed(1)} km/h
+                </small>
+            </div>
+            <span class="badge bg-primary rounded-pill">${carData.points.length}</span>
+        `;
+
+        carItem.addEventListener('click', () => {
+            if (carMarkers[carData.car_id]) {
+                map.setView([latestPoint.lat, latestPoint.lng], 20);
+                carMarkers[carData.car_id].openPopup();
+            }
+        });
+
+        carsList.appendChild(carItem);
+    });
+}
+
+function updateStatistics() {
+    const totalCars = carsData.length;
+    let movingCars = 0;
+    let stationaryCars = 0;
+
+    carsData.forEach(carData => {
+        if (carData.points.length > 0) {
+            const latestPoint = carData.points[carData.points.length - 1];
+            if (latestPoint.speed > 1.0) {
+                movingCars++;
+            } else {
+                stationaryCars++;
+            }
+        }
+    });
+
+    document.getElementById('totalCars').textContent = totalCars;
+    document.getElementById('movingCars').textContent = movingCars;
+    document.getElementById('stationaryCars').textContent = stationaryCars;
+}
+
+// Live data refresh
+function refreshLiveData() {
+    fetch(`/session/${sessionId}/live/`)
+        .then(response => response.json())
+        .then(data => {
+            // Update cars data with live information
+            console.log('Live data:', data);
+            
+            // Here you would update the visualization with new data
+            // For now, we'll just log it
+        })
+        .catch(error => {
+            console.error('Error fetching live data:', error);
+        });
+}
+
+// Search functionality
+document.getElementById('searchBtn').addEventListener('click', function() {
+    const query = document.getElementById('searchInput').value.trim();
+    if (query) {
+        searchCoordinates(query);
+    }
+});
+
+function searchCoordinates(query) {
+    // Check if query contains coordinates (lat,lng format)
+    const coordMatch = query.match(/(-?\d+\.?\d*),\s*(-?\d+\.?\d*)/);
+    if (coordMatch) {
+        const lat = parseFloat(coordMatch[1]);
+        const lng = parseFloat(coordMatch[2]);
+        map.setView([lat, lng], 20);
+        
+        L.marker([lat, lng]).addTo(map).bindPopup(`
+            <b>Searched Location</b><br>
+            Lat: ${lat}<br>
+            Lng: ${lng}
+        `).openPopup();
+        return;
+    }
+
+    // Search for car ID
+    const carData = carsData.find(car => car.car_id.toLowerCase().includes(query.toLowerCase()));
+    if (carData && carData.points.length > 0) {
+        const latestPoint = carData.points[carData.points.length - 1];
+        map.setView([latestPoint.lat, latestPoint.lng], 20);
+        if (carMarkers[carData.car_id]) {
+            carMarkers[carData.car_id].openPopup();
+        }
+    }
+}
+
+// View controls
+document.getElementById('viewAllBtn').addEventListener('click', function() {
+    updateMapVisualization();
+    setActiveButton(this);
+});
+
+document.getElementById('viewLatestBtn').addEventListener('click', function() {
+    // Focus on latest positions only
+    if (carsData.length > 0) {
+        const latestPoints = carsData.map(car => {
+            if (car.points.length > 0) {
+                const latest = car.points[car.points.length - 1];
+                return [latest.lat, latest.lng];
+            }
+            return null;
+        }).filter(point => point !== null);
+
+        if (latestPoints.length > 0) {
+            const group = new L.featureGroup(latestPoints.map(point => L.marker(point)));
+            map.fitBounds(group.getBounds(), {padding: [20, 20]});
+        }
+    }
+    setActiveButton(this);
+});
+
+document.getElementById('refreshBtn').addEventListener('click', function() {
+    refreshLiveData();
+    location.reload();
+});
+
+function setActiveButton(activeBtn) {
+    document.querySelectorAll('.btn-group .btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    activeBtn.classList.add('active');
+}
+
+// Initialize everything
+initializeMap();
+
+// Auto-refresh every 10 seconds
+setInterval(refreshLiveData, 10000);
+
+console.log('Car tracking visualization initialized');
+console.log('Total cars:', carsData.length);
+</script>
+{% endblock %}

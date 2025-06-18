@@ -1,0 +1,226 @@
+{% extends 'base.html' %}
+
+{% block title %}Create New Session - Car Tracking System{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-10">
+        <div class="card">
+            <div class="card-header">
+                <h4><i class="fas fa-plus"></i> Create New Tracking Session</h4>
+                <p class="mb-0 text-muted">Upload your video file and polygon boundary to start car tracking</p>
+            </div>
+            <div class="card-body">
+                {% if form.errors %}
+                    <div class="alert alert-danger">
+                        <h6>Please correct the following errors:</h6>
+                        <ul class="mb-0">
+                            {% for field, errors in form.errors.items %}
+                                {% for error in errors %}
+                                    <li><strong>{{ field }}:</strong> {{ error }}</li>
+                                {% endfor %}
+                            {% endfor %}
+                        </ul>
+                    </div>
+                {% endif %}
+
+                <form method="post" enctype="multipart/form-data" id="sessionForm">
+                    {% csrf_token %}
+                    
+                    <!-- Basic Information -->
+                    <div class="row mb-4">
+                        <div class="col-md-12">
+                            <h5><i class="fas fa-info-circle"></i> Basic Information</h5>
+                            <hr>
+                        </div>
+                        <div class="col-md-12 mb-3">
+                            <label for="id_name" class="form-label">Session Name *</label>
+                            {{ form.name }}
+                            <div class="form-text">{{ form.name.help_text }}</div>
+                        </div>
+                    </div>
+
+                    <!-- File Uploads -->
+                    <div class="row mb-4">
+                        <div class="col-md-12">
+                            <h5><i class="fas fa-upload"></i> File Uploads</h5>
+                            <hr>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="id_video_file" class="form-label">Video File *</label>
+                            {{ form.video_file }}
+                            <div class="form-text">{{ form.video_file.help_text }}</div>
+                            <div id="videoPreview" class="mt-2" style="display: none;">
+                                <video width="100%" height="200" controls>
+                                    <source id="videoSource" src="" type="video/mp4">
+                                    Your browser does not support the video tag.
+                                </video>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="id_polygon_file" class="form-label">Polygon Boundary File *</label>
+                            {{ form.polygon_file }}
+                            <div class="form-text">{{ form.polygon_file.help_text }}</div>
+                            <div id="polygonPreview" class="mt-2" style="display: none;">
+                                <div class="alert alert-info">
+                                    <strong>Polygon file loaded:</strong>
+                                    <div id="polygonInfo"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Optional Files -->
+                    <div class="row mb-4">
+                        <div class="col-md-12">
+                            <h5><i class="fas fa-images"></i> Optional Files</h5>
+                            <hr>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="id_geo_coords_file" class="form-label">Geographic Coordinates</label>
+                            {{ form.geo_coords_file }}
+                            <div class="form-text">{{ form.geo_coords_file.help_text }}</div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="id_reference_image" class="form-label">Reference Image</label>
+                            {{ form.reference_image }}
+                            <div class="form-text">{{ form.reference_image.help_text }}</div>
+                            <div id="imagePreview" class="mt-2" style="display: none;">
+                                <img id="previewImg" src="" alt="Preview" style="max-width: 100%; height: 200px; object-fit: cover;">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Motion Detection Settings -->
+                    <div class="row mb-4">
+                        <div class="col-md-12">
+                            <h5><i class="fas fa-cogs"></i> Motion Detection Settings</h5>
+                            <hr>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label for="id_motion_threshold" class="form-label">Motion Threshold</label>
+                            {{ form.motion_threshold }}
+                            <div class="form-text">{{ form.motion_threshold.help_text }}</div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label for="id_motion_sensitivity" class="form-label">Motion Sensitivity</label>
+                            {{ form.motion_sensitivity }}
+                            <div class="form-text">{{ form.motion_sensitivity.help_text }}</div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label for="id_min_motion_area" class="form-label">Min Motion Area</label>
+                            {{ form.min_motion_area }}
+                            <div class="form-text">{{ form.min_motion_area.help_text }}</div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label for="id_consecutive_motion_frames" class="form-label">Consecutive Frames</label>
+                            {{ form.consecutive_motion_frames }}
+                            <div class="form-text">{{ form.consecutive_motion_frames.help_text }}</div>
+                        </div>
+                    </div>
+
+                    <!-- Coordinate Settings -->
+                    <div class="row mb-4">
+                        <div class="col-md-12">
+                            <h5><i class="fas fa-map"></i> Coordinate Settings</h5>
+                            <hr>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="id_k_neighbors" class="form-label">K-Nearest Neighbors</label>
+                            {{ form.k_neighbors }}
+                            <div class="form-text">{{ form.k_neighbors.help_text }}</div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="id_location_precision" class="form-label">Location Precision</label>
+                            {{ form.location_precision }}
+                            <div class="form-text">{{ form.location_precision.help_text }}</div>
+                        </div>
+                    </div>
+
+                    <!-- Submit Buttons -->
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{% url 'dashboard' %}" class="btn btn-secondary me-md-2">
+                            <i class="fas fa-times"></i> Cancel
+                        </a>
+                        <button type="submit" class="btn btn-primary" id="submitBtn">
+                            <i class="fas fa-save"></i> Create Session
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Video file preview
+    document.getElementById('id_video_file').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            const videoPreview = document.getElementById('videoPreview');
+            const videoSource = document.getElementById('videoSource');
+            
+            const url = URL.createObjectURL(file);
+            videoSource.src = url;
+            videoPreview.style.display = 'block';
+            
+            console.log('Video loaded:', file.name, file.size, 'bytes');
+        }
+    });
+
+    // Image file preview
+    document.getElementById('id_reference_image').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            const imagePreview = document.getElementById('imagePreview');
+            const previewImg = document.getElementById('previewImg');
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                previewImg.src = e.target.result;
+                imagePreview.style.display = 'block';
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+
+    // Polygon file preview
+    document.getElementById('id_polygon_file').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const content = e.target.result;
+                const lines = content.trim().split('\n');
+                
+                document.getElementById('polygonInfo').innerHTML = `
+                    <strong>File:</strong> ${file.name}<br>
+                    <strong>Size:</strong> ${file.size} bytes<br>
+                    <strong>Lines:</strong> ${lines.length}
+                `;
+                document.getElementById('polygonPreview').style.display = 'block';
+            };
+            reader.readAsText(file);
+        }
+    });
+
+    // Form submission with loading state
+    document.getElementById('sessionForm').addEventListener('submit', function(e) {
+        const submitBtn = document.getElementById('submitBtn');
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating Session...';
+        submitBtn.disabled = true;
+        
+        // Re-enable button after 10 seconds in case of error
+        setTimeout(() => {
+            submitBtn.innerHTML = '<i class="fas fa-save"></i> Create Session';
+            submitBtn.disabled = false;
+        }, 10000);
+    });
+
+    console.log('Create session form initialized');
+});
+</script>
+{% endblock %}

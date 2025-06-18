@@ -1,0 +1,927 @@
+{% extends 'base.html' %}
+
+{% block title %}Live Video Stream - {{ session.name }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1><i class="fas fa-video"></i> Live Car Detection Stream - {{ session.name }}</h1>
+            <div>
+                <button id="startStreamBtn" class="btn btn-success me-2">
+                    <i class="fas fa-play"></i> Start Stream
+                </button>
+                <button id="stopStreamBtn" class="btn btn-danger me-2" disabled>
+                    <i class="fas fa-stop"></i> Stop Stream
+                </button>
+                <a href="{% url 'session_detail' session.id %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left"></i> Back to Session
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Stream Status -->
+<div class="row mb-3">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-md-3">
+                        <div class="d-flex align-items-center">
+                            <div id="streamStatus" class="status-indicator me-2"></div>
+                            <span id="statusText">Ready to stream</span>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="progress">
+                            <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%">
+                                <span id="progressText">0 FPS</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 text-end">
+                        <div id="statsDisplay">
+                            <span class="badge bg-success me-2">Moving: <span id="movingCarsCount">0</span></span>
+                            <span class="badge bg-info">Total: <span id="totalCarsCount">0</span></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Main Video Stream Display -->
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-body p-0 text-center">
+                <!-- Video Stream Container -->
+                <div id="videoContainer" class="position-relative">
+                    <img id="videoStream" 
+                         src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==" 
+                         alt="Video Stream" 
+                         class="img-fluid"
+                         style="max-width: 100%; height: auto; background: #000; min-height: 400px;">
+                    
+                    <!-- Stream Overlay Info -->
+                    <div id="streamOverlay" class="position-absolute top-0 start-0 p-3 text-white" 
+                         style="background: linear-gradient(135deg, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.4) 100%); border-radius: 0 0 15px 0;">
+                        <div class="d-flex align-items-center">
+                            <div class="live-indicator me-2"></div>
+                            <span class="fw-bold">LIVE DETECTION</span>
+                        </div>
+                        <small id="timestampDisplay">--:--:--</small>
+                    </div>
+                    
+                    <!-- Connection Status Overlay -->
+                    <div id="connectionOverlay" class="position-absolute top-0 end-0 p-3 text-white">
+                        <div class="d-flex align-items-center">
+                            <div id="connectionIndicator" class="status-indicator me-2"></div>
+                            <small id="connectionText">Connecting...</small>
+                        </div>
+                    </div>
+                    
+                    <!-- Loading Indicator -->
+                    <div id="loadingIndicator" class="position-absolute top-50 start-50 translate-middle text-white">
+                        <div class="spinner-border" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <div class="mt-2">Click "Start Stream" to begin...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Detection Information -->
+<div class="row mt-3">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-list"></i> Live Car Detections</h5>
+            </div>
+            <div class="card-body">
+                <div id="detectionsTable" class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+                    <table class="table table-sm table-hover">
+                        <thead class="table-light sticky-top">
+                            <tr>
+                                <th>Car ID</th>
+                                <th>Coordinates</th>
+                                <th>Status</th>
+                                <th>Last Seen</th>
+                            </tr>
+                        </thead>
+                        <tbody id="detectionsTableBody">
+                            <tr>
+                                <td colspan="4" class="text-center text-muted">
+                                    <i class="fas fa-info-circle"></i> Start streaming to see live detections
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-chart-line"></i> Live Statistics</h5>
+            </div>
+            <div class="card-body">
+                <div class="row text-center mb-3">
+                    <div class="col-6">
+                        <div class="h4 text-success mb-0" id="activeDetections">0</div>
+                        <small class="text-muted">Moving Cars</small>
+                    </div>
+                    <div class="col-6">
+                        <div class="h4 text-primary mb-0" id="totalDetections">0</div>
+                        <small class="text-muted">Total Tracked</small>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <h6>Connection Quality</h6>
+                    <div class="d-flex justify-content-between">
+                        <span>FPS:</span>
+                        <span id="streamFPS" class="badge bg-primary">0</span>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span>Status:</span>
+                        <span id="streamLatency" class="badge bg-info">Stopped</span>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span>Connection:</span>
+                        <span id="connectionStatus" class="badge bg-secondary">Disconnected</span>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span>Uptime:</span>
+                        <span id="connectionUptime" class="badge bg-info">0s</span>
+                    </div>
+                </div>
+                
+                <div class="mb-2">
+                    <h6>Detection Settings</h6>
+                    <small class="text-muted">
+                        <strong>Motion Threshold:</strong> {{ session.motion_threshold }}<br>
+                        <strong>Min Area:</strong> {{ session.min_motion_area }}<br>
+                        <strong>Sensitivity:</strong> {{ session.motion_sensitivity|floatformat:2 }}<br>
+                        <strong>K-Neighbors:</strong> {{ session.k_neighbors }}
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Real-time Detection Log -->
+<div class="row mt-3">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5><i class="fas fa-terminal"></i> Real-time Detection Log</h5>
+                <button id="clearLogBtn" class="btn btn-sm btn-outline-secondary">
+                    <i class="fas fa-trash"></i> Clear Log
+                </button>
+            </div>
+            <div class="card-body">
+                <div id="detectionLog" style="height: 200px; overflow-y: auto; font-family: monospace; font-size: 0.9em; background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 5px; padding: 10px;">
+                    <div class="text-muted">🎥 Ready to start streaming... Click "Start Stream" button above.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Hidden data -->
+<script type="application/json" id="sessionData">{{ session.id }}</script>
+<script type="application/json" id="streamingAvailable">{{ streaming_available|yesno:"true,false" }}</script>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .status-indicator {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background-color: #dc3545;
+        display: inline-block;
+        transition: all 0.3s ease;
+    }
+    
+    .status-indicator.connected {
+        background-color: #28a745;
+        animation: pulse 2s infinite;
+    }
+    
+    .status-indicator.streaming {
+        background-color: #007bff;
+        animation: pulse 1s infinite;
+    }
+    
+    .status-indicator.reconnecting {
+        background-color: #ffc107;
+        animation: blink 1s infinite;
+    }
+    
+    @keyframes pulse {
+        0% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7); }
+        70% { box-shadow: 0 0 0 10px rgba(40, 167, 69, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0); }
+    }
+    
+    @keyframes blink {
+        0%, 50% { opacity: 1; }
+        51%, 100% { opacity: 0; }
+    }
+    
+    .live-indicator {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        background-color: #ff0000;
+        border-radius: 50%;
+        animation: blink 1s infinite;
+    }
+    
+    #videoContainer {
+        background: #000;
+        min-height: 400px;
+        border-radius: 15px;
+        overflow: hidden;
+    }
+    
+    #videoStream {
+        border-radius: 15px;
+        width: 100%;
+        height: auto;
+    }
+    
+    .detection-entry {
+        padding: 2px 0;
+        border-bottom: 1px solid #e9ecef;
+    }
+    
+    .detection-entry:last-child {
+        border-bottom: none;
+    }
+    
+    .detection-entry.new {
+        background-color: #d4edda;
+        animation: highlight 2s ease-out;
+    }
+    
+    @keyframes highlight {
+        from { background-color: #d4edda; }
+        to { background-color: transparent; }
+    }
+
+    .detection-row {
+        cursor: pointer;
+    }
+
+    .detection-row:hover {
+        background-color: #f8f9fa;
+    }
+
+    .detection-row.highlight {
+        background-color: #fff3cd !important;
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Load session data
+const sessionId = JSON.parse(document.getElementById('sessionData').textContent);
+const streamingAvailable = JSON.parse(document.getElementById('streamingAvailable').textContent);
+
+// WebSocket connection variables
+let socket = null;
+let isConnected = false;
+let isStreaming = false;
+let heartbeatInterval = null;
+let reconnectAttempts = 0;
+let maxReconnectAttempts = 5;
+let connectionStartTime = null;
+let uptimeInterval = null;
+
+// Stream statistics
+let frameCount = 0;
+let lastFrameTime = Date.now();
+
+// DOM elements
+const videoStream = document.getElementById('videoStream');
+const streamStatus = document.getElementById('streamStatus');
+const statusText = document.getElementById('statusText');
+const startStreamBtn = document.getElementById('startStreamBtn');
+const stopStreamBtn = document.getElementById('stopStreamBtn');
+const loadingIndicator = document.getElementById('loadingIndicator');
+const progressBar = document.getElementById('progressBar');
+const progressText = document.getElementById('progressText');
+const movingCarsCount = document.getElementById('movingCarsCount');
+const totalCarsCount = document.getElementById('totalCarsCount');
+const activeDetections = document.getElementById('activeDetections');
+const totalDetections = document.getElementById('totalDetections');
+const timestampDisplay = document.getElementById('timestampDisplay');
+const streamFPS = document.getElementById('streamFPS');
+const streamLatency = document.getElementById('streamLatency');
+const connectionStatus = document.getElementById('connectionStatus');
+const connectionUptime = document.getElementById('connectionUptime');
+const connectionIndicator = document.getElementById('connectionIndicator');
+const connectionText = document.getElementById('connectionText');
+const detectionLog = document.getElementById('detectionLog');
+const detectionsTableBody = document.getElementById('detectionsTableBody');
+const clearLogBtn = document.getElementById('clearLogBtn');
+
+// Check if streaming is available
+if (!streamingAvailable) {
+    addToLog('❌ Streaming not available. Please install required components.', 'error');
+    startStreamBtn.disabled = true;
+    startStreamBtn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Streaming Unavailable';
+}
+
+// Initialize WebSocket connection with enhanced stability
+function initializeWebSocket() {
+    if (!streamingAvailable) {
+        addToLog('❌ Cannot connect: Streaming components not available', 'error');
+        return;
+    }
+
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${wsProtocol}//${window.location.host}/ws/stream/${sessionId}/`;
+    
+    addToLog('🔗 Connecting to WebSocket...', 'info');
+    updateConnectionStatus('reconnecting', 'Connecting...');
+    
+    socket = new WebSocket(wsUrl);
+    
+    socket.addEventListener('open', function(event) {
+        console.log('✅ WebSocket connected for video streaming');
+        isConnected = true;
+        reconnectAttempts = 0;
+        connectionStartTime = Date.now();
+        
+        updateConnectionStatus('connected', 'Connected');
+        updateStatus('connected', 'Connected - Ready to stream');
+        streamStatus.classList.add('connected');
+        streamLatency.textContent = 'Ready';
+        streamLatency.className = 'badge bg-success';
+        connectionStatus.textContent = 'Connected';
+        connectionStatus.className = 'badge bg-success';
+        
+        // Start heartbeat and uptime tracking
+        startHeartbeat();
+        startUptimeTracking();
+        
+        // Enable start button if streaming is available
+        if (streamingAvailable) {
+            startStreamBtn.disabled = false;
+        }
+        addToLog('✅ WebSocket connected successfully', 'success');
+    });
+    
+    socket.addEventListener('message', function(event) {
+        try {
+            const data = JSON.parse(event.data);
+            handleWebSocketMessage(data);
+        } catch (error) {
+            console.error('❌ Error parsing WebSocket message:', error, event.data);
+            addToLog('❌ Error parsing WebSocket message', 'error');
+        }
+    });
+    
+    socket.addEventListener('close', function(event) {
+        console.log('🔌 WebSocket disconnected', event.code, event.reason);
+        isConnected = false;
+        isStreaming = false;
+        
+        stopHeartbeat();
+        stopUptimeTracking();
+        
+        updateConnectionStatus('disconnected', 'Disconnected');
+        updateStatus('disconnected', 'Disconnected');
+        streamStatus.classList.remove('connected', 'streaming');
+        streamLatency.textContent = 'Disconnected';
+        streamLatency.className = 'badge bg-danger';
+        connectionStatus.textContent = 'Disconnected';
+        connectionStatus.className = 'badge bg-danger';
+        
+        // Disable buttons
+        startStreamBtn.disabled = true;
+        stopStreamBtn.disabled = true;
+        
+        addToLog(`🔌 WebSocket disconnected (code: ${event.code})`, 'warning');
+        
+        // Auto-reconnect with exponential backoff
+        if (reconnectAttempts < maxReconnectAttempts && streamingAvailable) {
+            const delay = Math.pow(2, reconnectAttempts) * 1000; // 1s, 2s, 4s, 8s, 16s
+            reconnectAttempts++;
+            
+            addToLog(`🔄 Attempting to reconnect in ${delay/1000}s (attempt ${reconnectAttempts}/${maxReconnectAttempts})...`, 'info');
+            updateConnectionStatus('reconnecting', `Reconnecting in ${delay/1000}s...`);
+            
+            setTimeout(() => {
+                initializeWebSocket();
+            }, delay);
+        } else {
+            addToLog('❌ Max reconnection attempts reached', 'error');
+            updateConnectionStatus('disconnected', 'Connection failed');
+        }
+    });
+    
+    socket.addEventListener('error', function(event) {
+        console.error('❌ WebSocket error:', event);
+        addToLog('❌ WebSocket connection error', 'error');
+        updateConnectionStatus('disconnected', 'Connection error');
+        connectionStatus.textContent = 'Error';
+        connectionStatus.className = 'badge bg-danger';
+    });
+}
+
+// Handle WebSocket messages
+function handleWebSocketMessage(data) {
+    console.log('📨 WebSocket message:', data.type, data);
+    
+    switch(data.type) {
+        case 'connected':
+            addToLog('📡 Stream connection established', 'success');
+            break;
+            
+        case 'pong':
+            // Heartbeat response received - connection is alive
+            break;
+            
+        case 'stream_started':
+            addToLog('▶️ Video stream starting...', 'info');
+            break;
+            
+        case 'video_frame':
+            // FIXED: Handle video frame with detection data
+            if (data.data) {
+                handleVideoFrame(data.data);
+            } else {
+                console.error('❌ No data in video_frame message');
+            }
+            break;
+
+        case 'stream_error':
+            addToLog(`❌ Stream error: ${data.message}`, 'error');
+            break;
+
+        case 'stream_stopped':
+            addToLog('⏹️ Stream stopped by server', 'warning');
+            handleStreamStopped();
+            break;
+
+        case 'stream_ready':
+            addToLog('✅ Server ready to stream', 'success');
+            break;
+            
+        default:
+            console.log('❓ Unknown message type:', data.type, data);
+    }
+}
+
+// Handle incoming video frames with FIXED detection data processing
+function handleVideoFrame(frameData) {
+    if (!isStreaming) {
+        isStreaming = true;
+        updateStatus('streaming', 'Streaming live video');
+        streamStatus.classList.add('streaming');
+        loadingIndicator.style.display = 'none';
+        
+        startStreamBtn.disabled = true;
+        stopStreamBtn.disabled = false;
+        
+        addToLog('🎥 Live video stream started!', 'success');
+    }
+    
+    // Update video frame
+    videoStream.src = `data:image/jpeg;base64,${frameData.frame}`;
+    
+    // FIXED: Update statistics with proper data handling
+    const movingCars = frameData.moving_cars || 0;
+    const totalCars = frameData.total_cars || 0;
+    const fps = frameData.fps || 0;
+    
+    // Update counters
+    movingCarsCount.textContent = movingCars;
+    totalCarsCount.textContent = totalCars;
+    activeDetections.textContent = movingCars;
+    totalDetections.textContent = totalCars;
+    
+    // Update FPS and progress
+    streamFPS.textContent = fps;
+    progressText.textContent = `${fps} FPS`;
+    progressBar.style.width = Math.min(fps * 10, 100) + '%';
+    
+    // Update timestamp
+    if (frameData.timestamp) {
+        timestampDisplay.textContent = frameData.timestamp;
+    }
+    
+    // CRITICAL FIX: Update detections table with proper data
+    const detections = frameData.detections || [];
+    console.log('🔍 Received detections:', detections.length, detections);
+    
+    updateDetectionsTable(detections);
+    
+    // FIXED: Log detections with better formatting
+    if (movingCars > 0 && detections.length > 0) {
+        addToLog(`🚗 Detected ${movingCars} moving car(s) | FPS: ${fps}`, 'detection');
+        
+        // Log individual car coordinates (limit to avoid spam)
+        if (frameCount % 10 === 0) {
+            detections.slice(0, 3).forEach(detection => {
+                addToLog(`   └─ ${detection.car_id}: ${detection.coordinates}`, 'detection');
+            });
+            if (detections.length > 3) {
+                addToLog(`   └─ ... and ${detections.length - 3} more cars`, 'detection');
+            }
+        }
+    } else if (movingCars > 0 && detections.length === 0) {
+        // DEBUG: Log when counts don't match
+        console.warn('⚠️ Moving cars count > 0 but no detections received');
+        addToLog(`⚠️ Detection mismatch: ${movingCars} cars but no detection data`, 'warning');
+    }
+    
+    // Update frame counter
+    frameCount++;
+}
+
+// Handle stream stopped
+function handleStreamStopped() {
+    isStreaming = false;
+    updateStatus('connected', 'Connected - Stream stopped');
+    streamStatus.classList.remove('streaming');
+    
+    // Reset UI
+    startStreamBtn.disabled = false;
+    stopStreamBtn.disabled = true;
+    loadingIndicator.style.display = 'block';
+    loadingIndicator.innerHTML = `
+        <div class="spinner-border" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <div class="mt-2">Click "Start Stream" to begin...</div>
+    `;
+    
+    // Reset counters
+    resetCounters();
+}
+
+// Reset all counters
+function resetCounters() {
+    movingCarsCount.textContent = '0';
+    totalCarsCount.textContent = '0';
+    activeDetections.textContent = '0';
+    totalDetections.textContent = '0';
+    streamFPS.textContent = '0';
+    progressText.textContent = '0 FPS';
+    progressBar.style.width = '0%';
+    timestampDisplay.textContent = '--:--:--';
+    
+    // Clear detections table
+    detectionsTableBody.innerHTML = `
+        <tr>
+            <td colspan="4" class="text-center text-muted">
+                <i class="fas fa-info-circle"></i> Start streaming to see live detections
+            </td>
+        </tr>
+    `;
+}
+
+// FIXED: Update detections table with better error handling
+function updateDetectionsTable(detections) {
+    console.log('📊 Updating detections table with:', detections);
+    
+    if (!detections || detections.length === 0) {
+        detectionsTableBody.innerHTML = `
+            <tr>
+                <td colspan="4" class="text-center text-muted">
+                    <i class="fas fa-search"></i> No moving cars detected
+                </td>
+            </tr>
+        `;
+        return;
+    }
+    
+    detectionsTableBody.innerHTML = '';
+    
+    detections.forEach((detection, index) => {
+        // FIXED: Validate detection data
+        if (!detection.car_id || !detection.coordinates) {
+            console.warn('⚠️ Invalid detection data:', detection);
+            return;
+        }
+        
+        const row = document.createElement('tr');
+        row.className = 'detection-row';
+        row.innerHTML = `
+            <td><strong>${detection.car_id}</strong></td>
+            <td><small>${detection.coordinates}</small></td>
+            <td><span class="badge bg-success">Moving</span></td>
+            <td><small>Now</small></td>
+        `;
+        
+        // Add click handler to highlight car
+        row.addEventListener('click', () => {
+            // Remove highlight from all rows
+            document.querySelectorAll('.detection-row').forEach(r => {
+                r.classList.remove('highlight');
+            });
+            
+            // Highlight clicked row
+            row.classList.add('highlight');
+            
+            // Log the clicked car
+            addToLog(`👆 Selected car: ${detection.car_id} at ${detection.coordinates}`, 'info');
+            
+            setTimeout(() => {
+                row.classList.remove('highlight');
+            }, 3000);
+        });
+        
+        detectionsTableBody.appendChild(row);
+    });
+    
+    console.log(`✅ Updated detections table with ${detections.length} cars`);
+}
+
+// Update status display
+function updateStatus(status, message) {
+    statusText.textContent = message;
+    streamStatus.className = 'status-indicator ' + status;
+}
+
+// Update connection status
+function updateConnectionStatus(status, message) {
+    connectionText.textContent = message;
+    connectionIndicator.className = 'status-indicator ' + status;
+}
+
+// Heartbeat functions
+function startHeartbeat() {
+    heartbeatInterval = setInterval(() => {
+        if (socket && socket.readyState === WebSocket.OPEN) {
+            socket.send(JSON.stringify({
+                type: 'ping',
+                timestamp: Date.now()
+            }));
+        }
+    }, 30000); // Every 30 seconds
+}
+
+function stopHeartbeat() {
+    if (heartbeatInterval) {
+        clearInterval(heartbeatInterval);
+        heartbeatInterval = null;
+    }
+}
+
+// Uptime tracking
+function startUptimeTracking() {
+    uptimeInterval = setInterval(() => {
+        if (connectionStartTime) {
+            const uptime = Math.floor((Date.now() - connectionStartTime) / 1000);
+            const minutes = Math.floor(uptime / 60);
+            const seconds = uptime % 60;
+            connectionUptime.textContent = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+        }
+    }, 1000);
+}
+
+function stopUptimeTracking() {
+    if (uptimeInterval) {
+        clearInterval(uptimeInterval);
+        uptimeInterval = null;
+    }
+    connectionUptime.textContent = '0s';
+}
+
+// Add entry to detection log
+function addToLog(message, type = 'info') {
+    const timestamp = new Date().toLocaleTimeString();
+    const entry = document.createElement('div');
+    entry.className = 'detection-entry new';
+    
+    let icon = '•';
+    let color = '#6c757d';
+    
+    switch(type) {
+        case 'success':
+            icon = '✅';
+            color = '#28a745';
+            break;
+        case 'error':
+            icon = '❌';
+            color = '#dc3545';
+            break;
+        case 'detection':
+            icon = '🚗';
+            color = '#007bff';
+            break;
+        case 'info':
+            icon = 'ℹ️';
+            color = '#17a2b8';
+            break;
+        case 'warning':
+            icon = '⚠️';
+            color = '#ffc107';
+            break;
+    }
+    
+    entry.innerHTML = `<span style="color: ${color};">${icon}</span> [${timestamp}] ${message}`;
+    
+    detectionLog.insertBefore(entry, detectionLog.firstChild);
+    
+    // Remove old entries (keep last 100)
+    while (detectionLog.children.length > 100) {
+        detectionLog.removeChild(detectionLog.lastChild);
+    }
+    
+    // Auto-scroll to top for new entries
+    detectionLog.scrollTop = 0;
+    
+    // Remove 'new' class after animation
+    setTimeout(() => {
+        entry.classList.remove('new');
+    }, 2000);
+}
+
+// Start streaming
+async function startStreaming() {
+    if (!streamingAvailable) {
+        addToLog('❌ Streaming not available', 'error');
+        return;
+    }
+
+    if (!isConnected) {
+        addToLog('❌ Not connected to WebSocket', 'error');
+        return;
+    }
+    
+    try {
+        addToLog('▶️ Starting video stream...', 'info');
+        loadingIndicator.style.display = 'block';
+        
+        // Start streaming via HTTP API
+        const response = await fetch(`/session/${sessionId}/start-streaming/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken'),
+                'Content-Type': 'application/json',
+            },
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            addToLog('✅ Video stream initiated successfully', 'success');
+            
+            // Send WebSocket message to start receiving frames
+            socket.send(JSON.stringify({
+                type: 'start_stream'
+            }));
+        } else {
+            addToLog(`❌ Failed to start stream: ${result.error}`, 'error');
+            loadingIndicator.style.display = 'none';
+        }
+        
+    } catch (error) {
+        addToLog(`❌ Error starting stream: ${error.message}`, 'error');
+        loadingIndicator.style.display = 'none';
+    }
+}
+
+// Stop streaming
+async function stopStreaming() {
+    try {
+        addToLog('⏹️ Stopping video stream...', 'info');
+        
+        const response = await fetch(`/session/${sessionId}/stop-streaming/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken'),
+                'Content-Type': 'application/json',
+            },
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            addToLog('✅ Video stream stopped successfully', 'success');
+            handleStreamStopped();
+        } else {
+            addToLog(`❌ Failed to stop stream: ${result.error}`, 'error');
+        }
+        
+    } catch (error) {
+        addToLog(`❌ Error stopping stream: ${error.message}`, 'error');
+    }
+}
+
+// Clear detection log
+function clearDetectionLog() {
+    detectionLog.innerHTML = '<div class="text-muted">📋 Detection log cleared.</div>';
+    addToLog('🧹 Detection log cleared', 'info');
+}
+
+// Get CSRF token
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+// Prevent disconnection when tab becomes inactive
+document.addEventListener('visibilitychange', function() {
+    if (document.hidden) {
+        // Tab became hidden - send keep alive
+        if (socket && socket.readyState === WebSocket.OPEN) {
+            socket.send(JSON.stringify({
+                type: 'keep_alive',
+                timestamp: Date.now()
+            }));
+        }
+    }
+});
+
+// Page focus/blur handlers
+window.addEventListener('focus', function() {
+    // Page got focus - reconnect if needed
+    if (!isConnected && streamingAvailable) {
+        addToLog('🔄 Page focused - checking connection...', 'info');
+        initializeWebSocket();
+    }
+});
+
+window.addEventListener('blur', function() {
+    // Page lost focus - send keep alive
+    if (socket && socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({
+            type: 'keep_alive',
+            timestamp: Date.now()
+        }));
+    }
+});
+
+// Event listeners
+startStreamBtn.addEventListener('click', startStreaming);
+stopStreamBtn.addEventListener('click', stopStreaming);
+clearLogBtn.addEventListener('click', clearDetectionLog);
+
+// DEBUG: Add detection debugging
+setInterval(() => {
+    if (isStreaming) {
+        console.log('🔍 Detection Status Check:', {
+            moving_cars: movingCarsCount.textContent,
+            total_cars: totalCarsCount.textContent,
+            fps: streamFPS.textContent,
+            connection: connectionStatus.textContent
+        });
+    }
+}, 5000); // Log every 5 seconds
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    addToLog('🚗 Car tracking video stream interface initialized', 'info');
+    addToLog(`📡 Session: ${sessionId}`, 'info');
+    
+    if (streamingAvailable) {
+        initializeWebSocket();
+    } else {
+        addToLog('⚠️ Streaming components not available. Please check installation.', 'warning');
+    }
+});
+
+// Cleanup on page unload
+window.addEventListener('beforeunload', function() {
+    stopHeartbeat();
+    stopUptimeTracking();
+    if (socket) {
+        socket.close();
+    }
+});
+
+console.log('🎥 Enhanced video streaming interface initialized for session:', sessionId);
+console.log('🔧 Streaming available:', streamingAvailable);
+console.log('💓 WebSocket stability features enabled');
+console.log('✅ FIXED frontend detection data handling');
+</script>
+{% endblock %}

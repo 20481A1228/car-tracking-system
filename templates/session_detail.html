@@ -1,0 +1,93 @@
+{% extends 'base.html' %}
+
+{% block title %}Live Stream - {{ session.name }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1><i class="fas fa-video"></i> Live Stream - {{ session.name }}</h1>
+            <a href="{% url 'session_detail' session.id %}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Session
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="fas fa-video"></i> Live Video Stream</h5>
+            </div>
+            <div class="card-body text-center">
+                <div class="alert alert-info">
+                    <h4><i class="fas fa-info-circle"></i> Streaming Feature</h4>
+                    <p>This is where the live video stream with car detection overlays will appear.</p>
+                    
+                    <div class="row mt-4">
+                        <div class="col-md-6">
+                            <h6>Session Information:</h6>
+                            <ul class="list-unstyled text-start">
+                                <li><strong>Name:</strong> {{ session.name }}</li>
+                                <li><strong>Status:</strong> {{ session.status }}</li>
+                                <li><strong>Cars Detected:</strong> {{ session.cars_detected|default:0 }}</li>
+                                <li><strong>Progress:</strong> {{ session.processed_frames }}/{{ session.total_frames }} frames</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>What you'll see here:</h6>
+                            <ul class="list-unstyled text-start">
+                                <li><i class="fas fa-check text-success"></i> Real-time video feed</li>
+                                <li><i class="fas fa-check text-success"></i> Car detection overlays</li>
+                                <li><i class="fas fa-check text-success"></i> Car IDs and coordinates</li>
+                                <li><i class="fas fa-check text-success"></i> Motion tracking</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="d-grid gap-2 d-md-block">
+                    <a href="{% url 'session_detail' session.id %}" class="btn btn-primary">
+                        <i class="fas fa-arrow-left"></i> Back to Session Details
+                    </a>
+                    {% if session.status == 'pending' %}
+                    <a href="{% url 'start_processing' session.id %}" class="btn btn-success">
+                        <i class="fas fa-play"></i> Start Background Processing
+                    </a>
+                    {% endif %}
+                    {% if session.status == 'completed' %}
+                    <a href="{% url 'visualization' session.id %}" class="btn btn-info">
+                        <i class="fas fa-map"></i> View on Map
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Placeholder for streaming interface -->
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-body text-center" style="min-height: 400px; background: #f8f9fa;">
+                <div class="d-flex align-items-center justify-content-center h-100">
+                    <div>
+                        <i class="fas fa-video fa-5x text-muted mb-3"></i>
+                        <h5 class="text-muted">Live Video Stream Coming Soon</h5>
+                        <p class="text-muted">This area will show the real-time video feed with car detection overlays</p>
+                        <small class="text-muted">Just like your standalone application with car IDs and coordinates</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+console.log('Live stream page loaded for session {{ session.id }}');
+</script>
+{% endblock %}
