@@ -22,7 +22,8 @@ A sophisticated real-time car tracking system with live video streaming, built w
 
 ### Installation
 ```bash
-
+# Clone repository
+git clone https://github.com/20481A1228/car-tracking-system.git
 cd car-tracking-system
 
 # Create virtual environment
